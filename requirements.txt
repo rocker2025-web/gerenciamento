@@ -1,0 +1,7 @@
+streamlit
+pandas
+pydrive2
+validate-docbr
+requests
+python-docx
+jinja2
