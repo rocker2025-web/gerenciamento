@@ -4,7 +4,7 @@ from pydrive2.auth import GoogleAuth
 from pydrive2.drive import GoogleDrive
 from oauth2client.service_account import ServiceAccountCredentials
 from validate_docbr import CPF, CNPJ
-import json
+import json # json ainda é necessário para o arquivo local
 import requests
 from datetime import date, datetime
 from docx import Document
@@ -19,24 +19,24 @@ def login_gdrive():
     gauth = GoogleAuth()
     scope = ["https://www.googleapis.com/auth/drive"]
     
-    # --- Alteração aqui para priorizar st.secrets para deploy na nuvem ---
+    # --- CORREÇÃO AQUI: Não usar json.loads() em st.secrets ---
     if hasattr(st, 'secrets') and 'gdrive_service_account' in st.secrets:
-        # Use credenciais do Streamlit Cloud Secrets
-        creds_dict = st.secrets["gdrive_service_account"]
+        # st.secrets["gdrive_service_account"] JÁ É UM DICIONÁRIO
+        creds_dict = st.secrets["gdrive_service_account"] 
         gauth.credentials = ServiceAccountCredentials.from_json_keyfile_dict(creds_dict, scope)
     else:
         # Fallback para arquivo local 'service_account.json' para desenvolvimento local
         try:
             with open('service_account.json', 'r') as f:
-                creds_dict = json.load(f) # Carrega o JSON do arquivo
-            gauth.credentials = ServiceAccountCredentials.from_json_keyfile_dict(creds_dict, scope) # Usa o dicionário carregado
+                creds_dict = json.load(f) # Aqui sim, precisa carregar o JSON do arquivo
+            gauth.credentials = ServiceAccountCredentials.from_json_keyfile_dict(creds_dict, scope)
         except FileNotFoundError:
             st.error("Arquivo de autenticação local 'service_account.json' não encontrado. Para deploy, configure st.secrets.")
             st.stop()
         except Exception as e:
             st.error(f"Erro ao carregar credenciais: {e}. Para deploy, configure st.secrets.")
             st.stop()
-    # --- Fim da alteração ---
+    # --- Fim da correção ---
 
     return GoogleDrive(gauth)
 
@@ -77,9 +77,8 @@ def gerar_contrato_docx(dados):
         run.bold = True
         return p
     
-    # --- ALTERAÇÃO: Após o texto DAS PARTES dar enter ---
-    add_clausula_heading("DAS PARTES") # Removido o \n para adicionar o parágrafo vazio
-    doc.add_paragraph("") # Adiciona um parágrafo vazio para simular um "enter"
+    add_clausula_heading("DAS PARTES")
+    doc.add_paragraph("")
     
     p_locadora = add_justified_paragraph()
     p_locadora.add_run("LOCADORA: ").bold = True
@@ -100,18 +99,16 @@ def gerar_contrato_docx(dados):
     add_clausula_heading("\nCLÁUSULA SEGUNDA – DOS EQUIPAMENTOS, VALORES E CONDIÇÕES")
     add_justified_paragraph("2.1. Equipamentos e Valores da Locação:")
 
-    # --- ALTERAÇÃO: Na tabela do item 2.1 deixar os textos centralizados e colocar o cabeçalho da tabela em negrito ---
     tabela = doc.add_table(rows=1, cols=5)
     tabela.style = 'Table Grid'
     tabela.autofit = False
     tabela.allow_autofit = False
     
-    # Definindo larguras das colunas para respeitar a margem do documento (total ~15.6 cm para garantir que caiba)
-    tabela.columns[0].width = Cm(1.3) # Item
-    tabela.columns[1].width = Cm(1.3) # Qtde
-    tabela.columns[2].width = Cm(7.0) # Equipamento (reduzido de 7.0)
-    tabela.columns[3].width = Cm(3.0) # Vlr. Unit. Mensal (R$) (reduzido de 3.0)
-    tabela.columns[4].width = Cm(3.0) # Vlr. Total Mensal (R$) (reduzido de 3.0)
+    tabela.columns[0].width = Cm(1.3)
+    tabela.columns[1].width = Cm(1.3)
+    tabela.columns[2].width = Cm(7.0)
+    tabela.columns[3].width = Cm(3.0)
+    tabela.columns[4].width = Cm(3.0)
 
     hdr_cells = tabela.rows[0].cells
     hdr_cells[0].text = 'Item'
@@ -120,13 +117,12 @@ def gerar_contrato_docx(dados):
     hdr_cells[3].text = 'Vlr. Unit. Mensal (R$)'
     hdr_cells[4].text = 'Vlr. Total Mensal (R$)'
 
-    # Formatar o cabeçalho: negrito e centralizado
     for cell in hdr_cells:
         for paragraph in cell.paragraphs:
             for run in paragraph.runs:
                 run.bold = True
             paragraph.alignment = WD_ALIGN_PARAGRAPH.CENTER
-            cell.vertical_alignment = WD_ALIGN_VERTICAL.CENTER # Centraliza verticalmente também
+            cell.vertical_alignment = WD_ALIGN_VERTICAL.CENTER
         
     total_locacao_mensal = 0
     for i, item in enumerate(dados['itens_contrato']):
@@ -139,11 +135,10 @@ def gerar_contrato_docx(dados):
         row_cells[4].text = f"{valor_total_item:.2f}"
         total_locacao_mensal += valor_total_item
         
-        # Centralizar o texto em todas as células de dados
         for cell in row_cells:
             for paragraph in cell.paragraphs:
                 paragraph.alignment = WD_ALIGN_PARAGRAPH.CENTER
-                cell.vertical_alignment = WD_ALIGN_VERTICAL.CENTER # Centraliza verticalmente
+                cell.vertical_alignment = WD_ALIGN_VERTICAL.CENTER
             
     add_justified_paragraph("\n2.2. Resumo Financeiro:")
     add_justified_paragraph(f"Valor Total da Locação Mensal: R$ {total_locacao_mensal:.2f}")
@@ -191,35 +186,32 @@ def gerar_contrato_docx(dados):
     add_justified_paragraph("10.1. Fica resguardado o direito de propriedade da LOCADORA sobre o equipamento contratado, acima de qualquer situação, condição ou pretexto alegados pela LOCATÁRIA ou por terceiros.")
     
     add_clausula_heading("\nCLÁUSULA DÉCIMA PRIMEIRA – DA RESCISÃO")
-    # --- ALTERAÇÃO: No item 11.1 adicionar enters ---
     p_rescisao_intro = doc.add_paragraph("11.1. O presente contrato fica rescindido de pleno direito, independente de qualquer aviso, sem prejuízo das penalidades, nas seguintes hipóteses:")
-    p_rescisao_intro.alignment = WD_ALIGN_PARAGRAPH.JUSTIFY # Mantém o alinhamento justificado
-    doc.add_paragraph("") # Enter após o cabeçalho
+    p_rescisao_intro.alignment = WD_ALIGN_PARAGRAPH.JUSTIFY
+    doc.add_paragraph("")
 
     p_item_I = doc.add_paragraph("I - Atraso no pagamento de 2 (dois) aluguéis consecutivos;")
     p_item_I.alignment = WD_ALIGN_PARAGRAPH.JUSTIFY
-    doc.add_paragraph("") # Enter após o sub-item I
+    doc.add_paragraph("")
 
     p_item_II = doc.add_paragraph("II - Infração das demais cláusulas contratuais;")
     p_item_II.alignment = WD_ALIGN_PARAGRAPH.JUSTIFY
-    doc.add_paragraph("") # Enter após o sub-item II
+    doc.add_paragraph("")
 
     p_item_III = doc.add_paragraph("III - Falência, insolvência ou concordata da LOCATÁRIA;")
     p_item_III.alignment = WD_ALIGN_PARAGRAPH.JUSTIFY
-    doc.add_paragraph("") # Enter após o sub-item III
+    doc.add_paragraph("")
 
     p_item_IV = doc.add_paragraph("IV - Quando a LOCADORA achar e julgar necessária o encerramento do contrato.")
     p_item_IV.alignment = WD_ALIGN_PARAGRAPH.JUSTIFY
-    doc.add_paragraph("") # Enter após o sub-item IV
+    doc.add_paragraph("")
 
     add_clausula_heading("CLÁUSULA DÉCIMA SEGUNDA – DO FORO")
     add_justified_paragraph("12.1. Fica eleito o foro central da comarca de São José para dirimir eventuais litígios oriundos deste contrato, se solução amigável não advir.")
 
-    # --- ALTERAÇÃO: DA DATA PARA BAIXO DEIXAR O TEXTO COM ALINHAMENTO PARA A ESQUERDA ---
     p_final_intro = doc.add_paragraph("E, por estarem justas e contratadas, as partes firmam o presente instrumento em 2 (duas) vias de igual teor e forma, na presença das duas testemunhas abaixo.")
-    p_final_intro.alignment = WD_ALIGN_PARAGRAPH.LEFT # Alinhamento à esquerda
+    p_final_intro.alignment = WD_ALIGN_PARAGRAPH.LEFT
     
-    # --- ALTERAÇÃO: Formatar a data em português do Brasil ---
     meses_pt = {
         "january": "janeiro", "february": "fevereiro", "march": "março",
         "april": "abril", "may": "maio", "june": "junho", "july": "julho",
@@ -227,18 +219,18 @@ def gerar_contrato_docx(dados):
         "november": "novembro", "december": "dezembro"
     }
     
-    data_assinatura_str = dados['data_assinatura'] # Ex: "04 de july de 2025"
+    data_assinatura_str = dados['data_assinatura']
     partes_data = data_assinatura_str.split(' de ')
-    data_formatada_pt = data_assinatura_str # Fallback
+    data_formatada_pt = data_assinatura_str
     if len(partes_data) == 3:
         dia = partes_data[0]
         mes_ingles = partes_data[1]
         ano = partes_data[2]
-        mes_portugues = meses_pt.get(mes_ingles.lower(), mes_ingles) # Converte para minúsculas para o lookup
+        mes_portugues = meses_pt.get(mes_ingles.lower(), mes_ingles)
         data_formatada_pt = f"{dia} de {mes_portugues} de {ano}"
 
     assinatura_data = doc.add_paragraph(f"\nSão José, {data_formatada_pt}.")
-    assinatura_data.alignment = WD_ALIGN_PARAGRAPH.LEFT # Alinhamento à esquerda
+    assinatura_data.alignment = WD_ALIGN_PARAGRAPH.LEFT
 
     p_assinatura_locadora_linha = doc.add_paragraph("_________________________________________")
     p_assinatura_locadora_linha.alignment = WD_ALIGN_PARAGRAPH.LEFT
@@ -247,7 +239,7 @@ def gerar_contrato_docx(dados):
     p_assinatura_locadora_qualif = doc.add_paragraph("(LOCADORA)")
     p_assinatura_locadora_qualif.alignment = WD_ALIGN_PARAGRAPH.LEFT
     
-    doc.add_paragraph("") # Espaço entre assinaturas
+    doc.add_paragraph("")
     
     p_assinatura_locataria_linha = doc.add_paragraph("_________________________________________")
     p_assinatura_locataria_linha.alignment = WD_ALIGN_PARAGRAPH.LEFT
@@ -256,11 +248,11 @@ def gerar_contrato_docx(dados):
     p_assinatura_locataria_qualif = doc.add_paragraph("(LOCATÁRIA)")
     p_assinatura_locataria_qualif.alignment = WD_ALIGN_PARAGRAPH.LEFT
     
-    doc.add_paragraph("") # Espaço antes das testemunhas
+    doc.add_paragraph("")
     
     p_testemunhas_titulo = doc.add_paragraph("Testemunhas:")
     p_testemunhas_titulo.alignment = WD_ALIGN_PARAGRAPH.LEFT
-    doc.add_paragraph("") # Espaço após o título de testemunhas
+    doc.add_paragraph("")
 
     p_testemunha1_linha = doc.add_paragraph("_________________________________________")
     p_testemunha1_linha.alignment = WD_ALIGN_PARAGRAPH.LEFT
@@ -268,7 +260,7 @@ def gerar_contrato_docx(dados):
     p_testemunha1_nome.alignment = WD_ALIGN_PARAGRAPH.LEFT
     p_testemunha1_cpf = doc.add_paragraph("CPF:")
     p_testemunha1_cpf.alignment = WD_ALIGN_PARAGRAPH.LEFT
-    doc.add_paragraph("") # Espaço entre testemunhas
+    doc.add_paragraph("")
     
     p_testemunha2_linha = doc.add_paragraph("_________________________________________")
     p_testemunha2_linha.alignment = WD_ALIGN_PARAGRAPH.LEFT
@@ -291,18 +283,13 @@ def gerar_fatura_docx(dados_fatura):
     style.font.size = Pt(12)
     style.paragraph_format.line_spacing = 1.5
 
-    # --- NOVO: Logo no início do documento (fora da tabela e do cabeçalho do Word) ---
     p_logo = doc.add_paragraph()
     p_logo.alignment = WD_ALIGN_PARAGRAPH.CENTER
     run_logo = p_logo.add_run()
     try:
-        # Aumentando a logo e ajustando as dimensões
         run_logo.add_picture('assets/logo.png', width=Cm(14.52), height=Cm(2.22)) 
     except FileNotFoundError:
         run_logo.text = "Rocker Equipamentos"
-    
-    # Removendo quebras de linha extras para diminuir o espaço
-    # doc.add_paragraph().add_run().add_break() 
     
     tabela_principal = doc.add_table(rows=7, cols=2)
     tabela_principal.style = 'Table Grid'
@@ -312,12 +299,10 @@ def gerar_fatura_docx(dados_fatura):
     tabela_principal.columns[0].width = Cm(10.0)
     tabela_principal.columns[1].width = Cm(7.0)
 
-    # --- LINHA 1: Dados da Rocker e Dados da Fatura ---
     celula_rocker = tabela_principal.cell(0, 0)
     celula_fatura = tabela_principal.cell(0, 1)
     
     celula_rocker.paragraphs[0].clear()
-    # "ROCKER LOCAÇÃO DE EQUP. PARA CONST. LTDA EPP" em negrito
     p_rocker_info = celula_rocker.add_paragraph()
     run_rocker_name = p_rocker_info.add_run("ROCKER LOCAÇÃO DE EQUP. PARA CONST. LTDA EPP\n")
     run_rocker_name.bold = True
@@ -331,12 +316,10 @@ def gerar_fatura_docx(dados_fatura):
     celula_fatura.add_paragraph(f"N°{dados_fatura['NUMERO_FATURA']}")
     celula_fatura.add_paragraph(f"Emissão: {dados_fatura['DATA_EMISSAO']}")
 
-    # --- LINHA 2: Título Destinatário ---
     celula_dest_titulo = tabela_principal.cell(1, 0).merge(tabela_principal.cell(1, 1))
     celula_dest_titulo.text = "DESTINATÁRIO"
     celula_dest_titulo.paragraphs[0].runs[0].bold = True
 
-    # --- LINHA 3: Informações do Cliente e Endereço ---
     celula_cliente_info_end = tabela_principal.cell(2, 0).merge(tabela_principal.cell(2, 1))
     
     p_cliente = celula_cliente_info_end.paragraphs[0] if celula_cliente_info_end.paragraphs else celula_cliente_info_end.add_paragraph()
@@ -349,7 +332,6 @@ def gerar_fatura_docx(dados_fatura):
     endereco_completo = f"{dados_fatura['ENDERECO_CLIENTE']}, {dados_fatura.get('BAIRRO_CLIENTE', '')} - {dados_fatura.get('CIDADE_CLIENTE', '')} - {dados_fatura.get('ESTADO_CLIENTE', 'SC')}, CEP: {dados_fatura.get('CEP_CLIENTE', '')}"
     p_cliente.add_run(endereco_completo)
     
-    # --- LINHA 4: Descrição ---
     celula_desc = tabela_principal.cell(3, 0).merge(tabela_principal.cell(3, 1))
     p_desc = celula_desc.paragraphs[0] if celula_desc.paragraphs else celula_desc.add_paragraph()
     p_desc.clear()
@@ -357,13 +339,12 @@ def gerar_fatura_docx(dados_fatura):
     run_desc_label.bold = True
     p_desc.add_run(f"{dados_fatura['DESCRICAO_SERVICO']}")
 
-    # --- LINHA 5: Valor e Vencimento ---
     celula_valor = tabela_principal.cell(4, 0)
     celula_vencimento = tabela_principal.cell(4, 1)
 
     celula_valor.paragraphs[0].clear()
     p_valor = celula_valor.add_paragraph()
-    run_valor_label = p_valor.add_run("Valor Total: ") # Adicionado negrito aqui
+    run_valor_label = p_valor.add_run("Valor Total: ")
     run_valor_label.bold = True
     p_valor.add_run(f"R$ {float(dados_fatura['VALOR_TOTAL'].replace(',', '.')):.2f}")
 
@@ -373,7 +354,6 @@ def gerar_fatura_docx(dados_fatura):
     run_venc_label.bold = True
     p_venc.add_run(f"{dados_fatura['DATA_VENCIMENTO']}")
     
-    # --- LINHA 6: Forma de Pagamento ---
     celula_forma_pag = tabela_principal.cell(5, 0).merge(tabela_principal.cell(5, 1))
     p_forma_pag = celula_forma_pag.paragraphs[0] if celula_forma_pag.paragraphs else celula_forma_pag.add_paragraph()
     p_forma_pag.clear()
@@ -381,20 +361,17 @@ def gerar_fatura_docx(dados_fatura):
     run_forma_pag_label.bold = True
     p_forma_pag.add_run(f"{dados_fatura['FORMA_PAGAMENTO']}")
 
-    # --- LINHA 7: Observações (com "Observações:" em negrito, texto em vermelho) ---
     celula_obs = tabela_principal.cell(6, 0).merge(tabela_principal.cell(6, 1))
     p_obs = celula_obs.paragraphs[0] if celula_obs.paragraphs else celula_obs.add_paragraph()
     p_obs.clear()
     run_obs_label = p_obs.add_run("Observações: ")
     run_obs_label.bold = True
     
-    # Pega a observação dos dados. Se não existir, será uma string vazia por padrão do .get()
     observacao = dados_fatura.get('OBSERVACAO', '') 
-    if observacao: # Adiciona o texto SOMENTE se ele não for vazio
+    if observacao:
         run_obs_text = p_obs.add_run(observacao)
-        run_obs_text.font.color.rgb = RGBColor(0xFF, 0x00, 0x00) # Cor vermelha (FF0000)
+        run_obs_text.font.color.rgb = RGBColor(0xFF, 0x00, 0x00)
 
-    # --- Rodapé do Documento ---
     section = doc.sections[0]
     footer = section.footer
     p_footer = footer.paragraphs[0] if footer.paragraphs else footer.add_paragraph()
