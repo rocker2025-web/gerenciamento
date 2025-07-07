@@ -19,9 +19,9 @@ def login_gdrive():
     gauth = GoogleAuth()
     scope = ["https://www.googleapis.com/auth/drive"]
     
-    # --- CORREÇÃO AQUI: Não usar json.loads() em st.secrets ---
     if hasattr(st, 'secrets') and 'gdrive_service_account' in st.secrets:
-        # st.secrets["gdrive_service_account"] JÁ É UM DICIONÁRIO
+        # AQUI st.secrets["gdrive_service_account"] DEVE SER UM DICIONÁRIO
+        # Se este erro persiste, o problema está na forma como o secret foi COLADO no Streamlit Cloud.
         creds_dict = st.secrets["gdrive_service_account"] 
         gauth.credentials = ServiceAccountCredentials.from_json_keyfile_dict(creds_dict, scope)
     else:
@@ -36,7 +36,6 @@ def login_gdrive():
         except Exception as e:
             st.error(f"Erro ao carregar credenciais: {e}. Para deploy, configure st.secrets.")
             st.stop()
-    # --- Fim da correção ---
 
     return GoogleDrive(gauth)
 
