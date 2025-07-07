@@ -18,18 +18,26 @@ import uuid
 def login_gdrive():
     gauth = GoogleAuth()
     scope = ["https://www.googleapis.com/auth/drive"]
-    try:
-        if hasattr(st, 'secrets') and 'gdrive_service_account' in st.secrets:
-            creds_dict = st.secrets["gdrive_service_account"]
-            gauth.credentials = ServiceAccountCredentials.from_json_keyfile_dict(creds_dict, scope)
-        else:
-            gauth.credentials = ServiceAccountCredentials.from_json_keyfile_name('service_account.json', scope)
-    except FileNotFoundError:
-        st.error("Arquivo de autenticação local 'service_account.json' não encontrado.")
-        st.stop()
-    except Exception as e:
-        st.error(f"Erro ao carregar credenciais: {e}")
-        st.stop()
+    
+    # --- Alteração aqui para priorizar st.secrets para deploy na nuvem ---
+    if hasattr(st, 'secrets') and 'gdrive_service_account' in st.secrets:
+        # Use credenciais do Streamlit Cloud Secrets
+        creds_dict = st.secrets["gdrive_service_account"]
+        gauth.credentials = ServiceAccountCredentials.from_json_keyfile_dict(creds_dict, scope)
+    else:
+        # Fallback para arquivo local 'service_account.json' para desenvolvimento local
+        try:
+            with open('service_account.json', 'r') as f:
+                creds_dict = json.load(f) # Carrega o JSON do arquivo
+            gauth.credentials = ServiceAccountCredentials.from_json_keyfile_dict(creds_dict, scope) # Usa o dicionário carregado
+        except FileNotFoundError:
+            st.error("Arquivo de autenticação local 'service_account.json' não encontrado. Para deploy, configure st.secrets.")
+            st.stop()
+        except Exception as e:
+            st.error(f"Erro ao carregar credenciais: {e}. Para deploy, configure st.secrets.")
+            st.stop()
+    # --- Fim da alteração ---
+
     return GoogleDrive(gauth)
 
 # --- FUNÇÃO PARA GERAR O CONTRATO EM WORD (COM ALTERAÇÕES DE FORMATAÇÃO) ---
