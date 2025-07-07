@@ -4,7 +4,7 @@ from pydrive2.auth import GoogleAuth
 from pydrive2.drive import GoogleDrive
 from oauth2client.service_account import ServiceAccountCredentials
 from validate_docbr import CPF, CNPJ
-import json # json ainda é necessário para o arquivo local
+import json
 import requests
 from datetime import date, datetime
 from docx import Document
@@ -19,26 +19,41 @@ def login_gdrive():
     gauth = GoogleAuth()
     scope = ["https://www.googleapis.com/auth/drive"]
     
-    if hasattr(st, 'secrets') and 'gdrive_service_account' in st.secrets:
-        # AQUI st.secrets["gdrive_service_account"] DEVE SER UM DICIONÁRIO
-        # Se este erro persiste, o problema está na forma como o secret foi COLADO no Streamlit Cloud.
-        creds_dict = st.secrets["gdrive_service_account"] 
+    # --- CORREÇÃO AQUI: Ler cada componente do secret individualmente ---
+    if hasattr(st, 'secrets') and 'gdrive_service_account_type' in st.secrets:
+        # Se os secrets individuais estiverem configurados no Streamlit Cloud
+        creds_dict = {
+            "type": st.secrets["gdrive_service_account_type"],
+            "project_id": st.secrets["gdrive_service_account_project_id"],
+            "private_key_id": st.secrets["gdrive_service_account_private_key_id"],
+            "private_key": st.secrets["gdrive_service_account_private_key"],
+            "client_email": st.secrets["gdrive_service_account_client_email"],
+            "client_id": st.secrets["gdrive_service_account_client_id"],
+            "auth_uri": st.secrets["gdrive_service_account_auth_uri"],
+            "token_uri": st.secrets["gdrive_service_account_token_uri"],
+            "auth_provider_x509_cert_url": st.secrets["gdrive_service_account_auth_provider_x509_cert_url"],
+            "client_x509_cert_url": st.secrets["gdrive_service_account_client_x509_cert_url"],
+            "universe_domain": st.secrets["gdrive_service_account_universe_domain"]
+        }
         gauth.credentials = ServiceAccountCredentials.from_json_keyfile_dict(creds_dict, scope)
     else:
         # Fallback para arquivo local 'service_account.json' para desenvolvimento local
         try:
             with open('service_account.json', 'r') as f:
-                creds_dict = json.load(f) # Aqui sim, precisa carregar o JSON do arquivo
+                creds_dict = json.load(f)
             gauth.credentials = ServiceAccountCredentials.from_json_keyfile_dict(creds_dict, scope)
         except FileNotFoundError:
-            st.error("Arquivo de autenticação local 'service_account.json' não encontrado. Para deploy, configure st.secrets.")
+            st.error("Arquivo de autenticação local 'service_account.json' não encontrado. Para deploy, configure st.secrets com chaves individuais.")
             st.stop()
         except Exception as e:
-            st.error(f"Erro ao carregar credenciais: {e}. Para deploy, configure st.secrets.")
+            st.error(f"Erro ao carregar credenciais locais: {e}. Para deploy, configure st.secrets com chaves individuais.")
             st.stop()
 
     return GoogleDrive(gauth)
 
+# --- O restante do seu utils.py permanece IGUAL ---
+# ...
+# ...
 # --- FUNÇÃO PARA GERAR O CONTRATO EM WORD (COM ALTERAÇÕES DE FORMATAÇÃO) ---
 def gerar_contrato_docx(dados):
     doc = Document()
