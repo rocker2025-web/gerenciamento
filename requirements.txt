@@ -1,7 +1,7 @@
 streamlit
-pandas
 pydrive2
+oauth2client
 validate-docbr
 requests
 python-docx
-jinja2
+pandas
